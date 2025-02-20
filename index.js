@@ -26,7 +26,7 @@ async function run() {
               await client.connect();
 
               // Create MongoDb DataBase
-              const userCollections = client.db('E-Commerce').collection('users')
+              // const userCollections = client.db('E-Commerce').collection('users')
 
               // Send a ping to confirm a successful connection
               await client.db("admin").command({ ping: 1 });
