@@ -16,8 +16,8 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
 const client = new MongoClient(uri, {
        serverApi: {
               version: ServerApiVersion.v1,
-              strict: true,
-              deprecationErrors: true,
+              strict: false,
+              deprecationErrors: false,
        }
 });
 async function run() {
@@ -27,6 +27,24 @@ async function run() {
 
               // MongoDb Database Collections
               const productsCollection = client.db("E-Commerce").collection("products");
+
+              // Get All Products
+              app.get('/products', async (req, res) => {
+                     const result = await productsCollection.find().toArray();
+                     res.send(result)
+              })
+              // Get All Category 
+              app.get('/categories', async (req, res) => {
+                     const categories = await productsCollection.distinct("Category");
+                     res.send(categories)
+              })
+              // Get Category Products
+              app.get('/products/:category', async (req, res) => {
+                     const category = req.params.category;
+                     const products = await productsCollection.find({Category:category}).limit(10).toArray();
+                     res.send(products)
+
+              })
 
               // Send a ping to confirm a successful connection
               await client.db("admin").command({ ping: 1 });
