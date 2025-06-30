@@ -6,8 +6,8 @@ const port = process.env.PORT || 5000;
 const { MongoClient, ServerApiVersion } = require('mongodb');
 
 // Middleware
-app.use(cors());
 app.use(express.json());
+app.use(cors());
 
 // MongoDB Connection
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.4vklw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -28,23 +28,23 @@ async function run() {
               // MongoDb Database Collections
               const productsCollection = client.db("E-Commerce").collection("products");
 
-              // Get All Products
-              app.get('/products', async (req, res) => {
-                     const result = await productsCollection.find().toArray();
-                     res.send(result)
-              })
               // Get All Category 
               app.get('/categories', async (req, res) => {
                      const categories = await productsCollection.distinct("Category");
                      res.send(categories)
               })
               // Get Category Products
-              app.get('/products/:category', async (req, res) => {
-                     const category = req.params.category;
-                     const products = await productsCollection.find({Category:category}).limit(10).toArray();
-                     res.send(products)
-
-              })
+              app.get('/categoryProducts', async (req, res) => {
+                     const query = req.query; /* ----------Query For String To Object---------- */
+                     const booleanFields = ['isNewArrival', 'isBestSeller', 'isOnSale']
+                     booleanFields.forEach(field => {
+                            if(query[field] !== undefined){
+                                   query[field] = query[field] === 'true';
+                            }
+                     })
+                     const products = await productsCollection.find(query).limit(10).toArray();
+                     res.send(products);
+              });
 
               // Send a ping to confirm a successful connection
               await client.db("admin").command({ ping: 1 });
