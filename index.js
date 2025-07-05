@@ -27,6 +27,7 @@ async function run() {
 
               // MongoDb Database Collections
               const productsCollection = client.db("E-Commerce").collection("products");
+              const reviewsCollection = client.db("E-Commerce").collection("reviews");
 
               // Get All Category 
               app.get('/categories', async (req, res) => {
@@ -45,6 +46,11 @@ async function run() {
                      const products = await productsCollection.find(query).limit(10).toArray();
                      res.send(products);
               });
+              // Get All Reviews
+              app.get('/reviews', async (req, res) => {
+                     const reviews = await reviewsCollection.find().toArray()
+                     res.send(reviews)
+              })
 
               // Send a ping to confirm a successful connection
               await client.db("admin").command({ ping: 1 });
