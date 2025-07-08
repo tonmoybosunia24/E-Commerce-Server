@@ -28,11 +28,12 @@ async function run() {
               // MongoDb Database Collections
               const productsCollection = client.db("E-Commerce").collection("products");
               const reviewsCollection = client.db("E-Commerce").collection("reviews");
+              const blogsCollection = client.db("E-Commerce").collection("blogs");
 
               // Get All Category 
               app.get('/categories', async (req, res) => {
                      const categories = await productsCollection.distinct("Category");
-                     res.send(categories)
+                     res.send(categories);
               })
               // Get Category Products
               app.get('/categoryProducts', async (req, res) => {
@@ -48,8 +49,13 @@ async function run() {
               });
               // Get All Reviews
               app.get('/reviews', async (req, res) => {
-                     const reviews = await reviewsCollection.find().toArray()
-                     res.send(reviews)
+                     const reviews = await reviewsCollection.find().toArray();
+                     res.send(reviews);
+              })
+              // Get All Blogs
+              app.get('/blogs', async (req, res) => {
+                     const blogs = await blogsCollection.find().toArray();
+                     res.send(blogs);
               })
 
               // Send a ping to confirm a successful connection
