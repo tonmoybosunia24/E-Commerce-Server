@@ -40,7 +40,7 @@ async function run() {
                      const query = req.query; /* ----------Query For String To Object---------- */
                      const booleanFields = ['isNewArrival', 'isBestSeller', 'isOnSale']
                      booleanFields.forEach(field => {
-                            if(query[field] !== undefined){
+                            if (query[field] !== undefined) {
                                    query[field] = query[field] === 'true';
                             }
                      })
