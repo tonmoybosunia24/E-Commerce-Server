@@ -30,6 +30,86 @@ async function run() {
               const reviewsCollection = client.db("E-Commerce").collection("reviews");
               const blogsCollection = client.db("E-Commerce").collection("blogs");
 
+              // Get All Products
+              app.get('/allProducts', async (req, res) => {
+                     // Pagination For Products
+                     const page = parseInt(req.query.page) || 1;
+                     const limit = parseInt(req.query.limit) || 12;
+                     const skip = (page - 1) * limit;
+                     // Search For Products
+                     const search = req.query.search || '';
+                     // Sorting For Products
+                     const sort = req.query.sort || 'name-asc'
+                     const sortMap = { 'name-asc': { Title: 1 }, 'name-desc': { Title: -1 }, 'price-asc': { Price: 1 }, 'price-desc': { Price: -1 } };
+                     const sortOption = sortMap[sort];
+                     // Query For Stop Sending Unwanted Products
+                     const query = { Title: { $exists: true, $ne: '' } };
+                     // Add search filter
+                     if (search && search.trim() !== '') {
+                            query.$or = [
+                                   { Title: { $regex: search.trim(), $options: 'i' } },
+                                   { SubCategory: { $regex: search.trim(), $options: 'i' } },
+                                   { Title: { $regex: search, $options: 'i' } },
+                                   { SubCategory: { $regex: search, $options: 'i' } },
+                                   { Brand: { $regex: search, $options: 'i' } },
+                                   { Description: { $regex: search, $options: 'i' } }
+                            ];
+                     }
+                     // Filters For Products Availability
+                     if (req.query.availability) {
+                            const availabilityValues = req.query.availability.split(',');
+                            query.AvailabilityStatus = { $in: availabilityValues };
+                     }
+                     // Filters For Products Size
+                     if (req.query.size) {
+                            const sizeValues = req.query.size.split(',');
+                            query.Variant = { $in: sizeValues };
+                     }
+                     // Filters For Products Color
+                     if (req.query.color) {
+                            const colorValues = req.query.color.split(',');
+                            query.Colors = { $in: colorValues };
+                     }
+                     // Filters For Products Price Slider
+                     if (req.query.minPrice && req.query.maxPrice) {
+                            query.Price = { $gte: Number(req.query.minPrice), $lte: Number(req.query.maxPrice) };
+                     }
+                     // Filters For Products Brands
+                     if (req.query.brands) {
+                            const brandsValues = req.query.brands.split(',');
+                            query.Brand = { $in: brandsValues }
+                     }
+                     // Dynamic Counts For Size
+                     const sizeOptions = ['S', 'M', 'L', 'XL', 'XXL'];
+                     const sizeCounts = {};
+                     for (const size of sizeOptions) {
+                            sizeCounts[size] = await productsCollection.countDocuments({
+                                   Variant: { $in: [size] }
+                            });
+                     }
+                     // Dynamic Counts For Availability
+                     const availabilityOptions = ['In Stock', 'Limited Stock', 'Not Available'];
+                     const availabilityCounts = {};
+                     for (const status of availabilityOptions) {
+                            availabilityCounts[status] = await productsCollection.countDocuments({ AvailabilityStatus: status });
+                     }
+                     // Dynamic Counts For Colors
+                     const colorOptions = ['#FF0000', '#000000', '#FFFFFF', '#CCCCCC'];
+                     const colorCounts = {};
+                     for (const color of colorOptions) {
+                            colorCounts[color] = await productsCollection.countDocuments({ Colors: color });
+                     }
+                     // Dynamic Counts For Brand
+                     const brandsOptions = ['Apple', 'Samsung', 'Sony', 'Nike'];
+                     const brandsCounts = {};
+                     for (const brands of brandsOptions) {
+                            brandsCounts[brands] = await productsCollection.countDocuments({ Brand: brands });
+                     }
+                     // All Products Sending To Backend
+                     const allProducts = await productsCollection.find(query).sort(sortOption).skip(skip).limit(limit).toArray();
+                     const total = await productsCollection.countDocuments(query)
+                     res.send({ allProducts, totalPages: Math.ceil(total / limit), currentPage: page, limit, counts: { size: sizeCounts, availability: availabilityCounts, color: colorCounts, brands: brandsCounts } });
+              })
               // Get All Category 
               app.get('/categories', async (req, res) => {
                      const categories = await productsCollection.distinct("Category");
