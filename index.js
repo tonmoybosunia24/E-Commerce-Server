@@ -3,7 +3,7 @@ const app = express();
 require('dotenv').config();
 const cors = require('cors');
 const port = process.env.PORT || 5000;
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 // Middleware
 app.use(express.json());
@@ -109,6 +109,16 @@ async function run() {
                      const allProducts = await productsCollection.find(query).sort(sortOption).skip(skip).limit(limit).toArray();
                      const total = await productsCollection.countDocuments(query)
                      res.send({ allProducts, totalPages: Math.ceil(total / limit), currentPage: page, limit, counts: { size: sizeCounts, availability: availabilityCounts, color: colorCounts, brands: brandsCounts } });
+              })
+              // Get Single Product With Related Products
+              app.get('/productDetails/:id', async (req, res) => {
+                     const id = req.params.id;
+                     const product = await productsCollection.findOne({ _id: new ObjectId(id) })
+                     const relatedProducts = await productsCollection.find({
+                            category: product.category,
+                            _id: { $ne: new ObjectId(id) }
+                     }).limit(10).toArray();
+                     res.send({ product, relatedProducts });
               })
               // Get All Category 
               app.get('/categories', async (req, res) => {
