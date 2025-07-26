@@ -105,7 +105,7 @@ async function run() {
                      for (const brands of brandsOptions) {
                             brandsCounts[brands] = await productsCollection.countDocuments({ Brand: brands });
                      }
-                     // All Products Sending To Backend
+                     // All Products Sending To FrontEnd
                      const allProducts = await productsCollection.find(query).sort(sortOption).skip(skip).limit(limit).toArray();
                      const total = await productsCollection.countDocuments(query)
                      res.send({ allProducts, totalPages: Math.ceil(total / limit), currentPage: page, limit, counts: { size: sizeCounts, availability: availabilityCounts, color: colorCounts, brands: brandsCounts } });
@@ -113,38 +113,54 @@ async function run() {
               // Get Single Product With Related Products
               app.get('/productDetails/:id', async (req, res) => {
                      const id = req.params.id;
+                     // Object Id Validation
+                     if (!ObjectId.isValid(id)) {
+                            return res.status(400).send({ error: 'Invalid product ID' });
+                     }
+                     // Find Single Product Form Id
                      const product = await productsCollection.findOne({ _id: new ObjectId(id) })
+                     // Find Related Products From Single Product Category
                      const relatedProducts = await productsCollection.find({
-                            category: product.category,
+                            Category: { $regex: new RegExp(`^${product.Category?.trim()}$`, 'i') },
                             _id: { $ne: new ObjectId(id) }
                      }).limit(10).toArray();
+                     // Sending Single Product And Related Product To FrontEnd
                      res.send({ product, relatedProducts });
               })
               // Get All Category 
               app.get('/categories', async (req, res) => {
+                     // Find All Category
                      const categories = await productsCollection.distinct("Category");
+                     // Send Category To FrontEnd
                      res.send(categories);
               })
               // Get Category Products
               app.get('/categoryProducts', async (req, res) => {
                      const query = req.query; /* ----------Query For String To Object---------- */
+                     // Find The Category Paramiter
                      const booleanFields = ['isNewArrival', 'isBestSeller', 'isOnSale']
                      booleanFields.forEach(field => {
                             if (query[field] !== undefined) {
                                    query[field] = query[field] === 'true';
                             }
                      })
+                     // Find The Category Products
                      const products = await productsCollection.find(query).limit(10).toArray();
+                     // Send Cateogory Products To FrontEnd 
                      res.send(products);
               });
               // Get All Reviews
               app.get('/reviews', async (req, res) => {
+                     // Find ALl The Reviews
                      const reviews = await reviewsCollection.find().toArray();
+                     // Send Reviews Products To FrontEnd 
                      res.send(reviews);
               })
               // Get All Blogs
               app.get('/blogs', async (req, res) => {
+                     // Find ALl The Blogs
                      const blogs = await blogsCollection.find().toArray();
+                     // Send Blogs To FrontEnd
                      res.send(blogs);
               })
 
