@@ -26,10 +26,20 @@ async function run() {
               await client.connect();
 
               // MongoDb Database Collections
+              const usersCollection = client.db("E-Commerce").collection("users");
               const productsCollection = client.db("E-Commerce").collection("products");
               const reviewsCollection = client.db("E-Commerce").collection("reviews");
               const blogsCollection = client.db("E-Commerce").collection("blogs");
 
+              // Post Users Data To Database
+              app.post('/users', async (req, res) => {
+                     // Get The Users Data
+                     const user = req.body;
+                     // Sent Users Data To MongoDb
+                     const result = usersCollection.insertOne(user);
+                     // Sent The Response To FrontEnd
+                     res.send(result);
+              })
               // Get All Products
               app.get('/allProducts', async (req, res) => {
                      // Pagination For Products
