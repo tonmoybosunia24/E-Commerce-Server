@@ -89,6 +89,11 @@ async function run() {
                             const brandsValues = req.query.brands.split(',');
                             query.Brand = { $in: brandsValues }
                      }
+                     // Filter For Products Category
+                     if (req.query.category) {
+                            const categoryValues = req.query.category.split(',');
+                            query.Category = { $in: categoryValues };
+                     }
                      // Dynamic Counts For Size
                      const sizeOptions = ['S', 'M', 'L', 'XL', 'XXL'];
                      const sizeCounts = {};
