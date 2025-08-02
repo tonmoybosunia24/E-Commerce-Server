@@ -30,6 +30,7 @@ async function run() {
               const productsCollection = client.db("E-Commerce").collection("products");
               const reviewsCollection = client.db("E-Commerce").collection("reviews");
               const blogsCollection = client.db("E-Commerce").collection("blogs");
+              const cartsCollection = client.db("E-Commerce").collection("carts");
 
               // Post Users Data To Database
               app.post('/users', async (req, res) => {
@@ -161,7 +162,7 @@ async function run() {
                      })
                      // Find The Category Products
                      const products = await productsCollection.find(query).limit(10).toArray();
-                     // Send Cateogory Products To FrontEnd 
+                     // Send Category Products To FrontEnd 
                      res.send(products);
               });
               // Get All Reviews
@@ -178,7 +179,55 @@ async function run() {
                      // Send Blogs To FrontEnd
                      res.send(blogs);
               })
-
+              // Get Users Carts Data
+              app.get('/carts', async (req, res) => {
+                     // Get The User Email
+                     const email = req.query.email;
+                     // Find Users Email To MongoDb
+                     const query = { email: email };
+                     const result = await cartsCollection.find(query).toArray();
+                     // Send Carts To FrontEnd
+                     res.send(result);
+              })
+              // Post Carts Data To DataBase
+              app.post('/carts', async (req, res) => {
+                     // Get The Cards Data
+                     const carts = req.body;
+                     // Sent Users Data To MongoDb
+                     const result = cartsCollection.insertOne(carts);
+                     // Sent The Response To FrontEnd
+                     res.send(result);
+              })
+              // Update Quantity Form Carts
+              app.patch('/carts/:id', async (req, res) => {
+                     // Get The Users Id
+                     const id = req.params.id;
+                     // Get The Items Quantity
+                     const { quantity } = req.body;
+                     // Find Id In MongoDb
+                     const filter = { _id: new ObjectId(id) };
+                     // Find Quantity In MongoDb
+                     const updateDoc = {
+                            $set: {
+                                   Quantity: quantity,
+                            },
+                     };
+                     // Send Data For Update Quantity
+                     const result = await cartsCollection.updateOne(filter, updateDoc);
+                     // Send Update Quantity To FrontEnd
+                     res.send(result)
+              })
+              // Delete Users Cart Data
+              app.delete('/carts/:id', async (req, res) => {
+                     // Get The Carts Id
+                     const id = req.params.id;
+                     // Find Id In MongoDb
+                     const query = { _id: new ObjectId(id) };
+                     // Send Data For Delete Card
+                     const result = await cartsCollection.deleteOne(query);
+                     // Send Delete Result To FrontEnd
+                     res.send(result);
+              })
               // Send a ping to confirm a successful connection
               await client.db("admin").command({ ping: 1 });
               console.log("Pinged your deployment. You successfully connected to MongoDB!");
