@@ -2,6 +2,7 @@ const express = require('express');
 const app = express();
 require('dotenv').config();
 const cors = require('cors');
+const jwt = require('jsonwebtoken')
 const port = process.env.PORT || 5000;
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
@@ -32,6 +33,31 @@ async function run() {
               const blogsCollection = client.db("E-Commerce").collection("blogs");
               const cartsCollection = client.db("E-Commerce").collection("carts");
 
+              // Jwt Token Post To DataBase
+              app.post('/jwt', async (req, res) => {
+                     // Get The Users Email
+                     const userEmail = req.body;
+                     // Create A Jwt Token
+                     const token = jwt.sign(userEmail, process.env.ACCESS_TOKEN_SECRET, {
+                            expiresIn: '1h'
+                     });
+                     // Send The Token To FrontEnd
+                     res.send({ token });
+              });
+              // Verify Token For Protected Routes
+              const verifyToken = (req, res, next) => {
+                     if (!req.headers.authorization) {
+                            return res.status(401).send({ message: 'Unauthorized Access' });
+                     }
+                     const token = req.headers.authorization.split(' ')[1];
+                     jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+                            if (err) {
+                                   return res.status(401).send({ message: 'Unauthorized Access' })
+                            }
+                            req.decoded = decoded;
+                            next();
+                     })
+              }
               // Post Users Data To Database
               app.post('/users', async (req, res) => {
                      // Get The Users Data
@@ -180,7 +206,7 @@ async function run() {
                      res.send(blogs);
               })
               // Get Users Carts Data
-              app.get('/carts', async (req, res) => {
+              app.get('/carts',  async (req, res) => {
                      // Get The User Email
                      const email = req.query.email;
                      // Find Users Email To MongoDb
@@ -190,7 +216,7 @@ async function run() {
                      res.send(result);
               })
               // Post Carts Data To DataBase
-              app.post('/carts', async (req, res) => {
+              app.post('/carts',  async (req, res) => {
                      // Get The Cards Data
                      const carts = req.body;
                      // Sent Users Data To MongoDb
