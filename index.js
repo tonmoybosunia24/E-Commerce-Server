@@ -44,7 +44,7 @@ async function run() {
                      // Send The Token To FrontEnd
                      res.send({ token });
               });
-              // Verify Token For Protected Routes
+              // Verify Token For Protected Routes Middleware
               const verifyToken = (req, res, next) => {
                      if (!req.headers.authorization) {
                             return res.status(401).send({ message: 'Unauthorized Access' });
@@ -206,7 +206,7 @@ async function run() {
                      res.send(blogs);
               })
               // Get Users Carts Data
-              app.get('/carts',  async (req, res) => {
+              app.get('/carts', verifyToken, async (req, res) => {
                      // Get The User Email
                      const email = req.query.email;
                      // Find Users Email To MongoDb
@@ -216,7 +216,7 @@ async function run() {
                      res.send(result);
               })
               // Post Carts Data To DataBase
-              app.post('/carts',  async (req, res) => {
+              app.post('/carts', verifyToken, async (req, res) => {
                      // Get The Cards Data
                      const carts = req.body;
                      // Sent Users Data To MongoDb
