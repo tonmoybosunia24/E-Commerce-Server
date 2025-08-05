@@ -58,7 +58,44 @@ async function run() {
                             next();
                      })
               }
-              // Post Users Data To Database
+              // Verify Admin For Protected Routes Middleware
+              const verifyAdmin = async (req, res, next) => {
+                     // Get The Email From Jwt Token
+                     const email = req.decoded?.email;
+                     // Find The Email In MongoDb
+                     const query = { email: email };
+                     // Get The Email In MongoDb
+                     const user = await usersCollection.findOne(query);
+                     // Check The Email That Admin Or Nor
+                     const isAdmin = user?.role === 'Admin';
+                     // If Not Admin Send A Status Message
+                     if (!isAdmin) {
+                            return res.status(403).send({ message: 'Forbidden Access' })
+                     };
+                     // Allow Permission For Go Next
+                     next();
+              }
+              // Get Admin Data From DataBase
+              app.get('/admin/:email', verifyToken, async (req, res) => {
+                     // Get The Users Email
+                     const email = req.params.email;
+                     // Check The Email Verification
+                     if (email !== req.decoded?.email) {
+                            return res.status(403).send({ message: 'Unauthorized Access' })
+                     }
+                     // Find The Email From MongoDb
+                     const query = { email: email }
+                     // Get The User From MongoDb
+                     const user = await usersCollection.findOne(query);
+                     // Check The User That Admin Or Not
+                     let Admin = false;
+                     if (user) {
+                            Admin = user?.role === 'Admin'
+                     }
+                     // Send This Data To FrontEnd
+                     res.send({ Admin });
+              });
+              // Post Users Data To DataBase
               app.post('/users', async (req, res) => {
                      // Get The Users Data
                      const user = req.body;
@@ -220,7 +257,7 @@ async function run() {
                      // Get The Cards Data
                      const carts = req.body;
                      // Sent Users Data To MongoDb
-                     const result = cartsCollection.insertOne(carts);
+                     const result = await cartsCollection.insertOne(carts);
                      // Sent The Response To FrontEnd
                      res.send(result);
               })
