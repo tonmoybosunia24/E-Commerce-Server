@@ -113,6 +113,36 @@ async function run() {
                      // Sent The Response To FrontEnd
                      res.send(result);
               })
+              // Get Admin Products
+              app.get('/adminProducts', verifyToken, verifyAdmin, async (req, res) => {
+                     const query = { Title: { $exists: true, $ne: '' } };
+                     const products = await productsCollection.find(query).toArray();
+                     res.send(products)
+              })
+              // Delete Product From DataBase
+              app.delete('/products/:id', verifyToken, verifyAdmin, async (req, res) => {
+                     // Get The Carts Id
+                     const id = req.params.id;
+                     // Find Id In MongoDb
+                     const query = { _id: new ObjectId(id) };
+                     // Send Data For Delete Card
+                     const result = await productsCollection.deleteOne(query);
+                     // Send Delete Result To FrontEnd
+                     res.send(result);
+              })
+              // Get Single Product For Update
+              app.get('/updateProducts/:id', async (req, res) => {
+                     // Get The Update Product Id
+                     const id = req.params.id;
+                     // Object Id Validation
+                     if (!ObjectId.isValid(id)) {
+                            return res.status(400).send({ error: 'Invalid product ID' });
+                     }
+                     // Find Single Update Product Form Id
+                     const product = await productsCollection.findOne({ _id: new ObjectId(id) })
+                     // Send Data To FrontEnd
+                     res.send(product)
+              })
               // Get Query Products
               app.get('/products', async (req, res) => {
                      // Pagination For Products
@@ -200,6 +230,7 @@ async function run() {
               })
               // Get Single Product With Related Products
               app.get('/productDetails/:id', async (req, res) => {
+                     // Get The Id 
                      const id = req.params.id;
                      // Object Id Validation
                      if (!ObjectId.isValid(id)) {
