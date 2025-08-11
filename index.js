@@ -104,8 +104,17 @@ async function run() {
                      // Sent The Response To FrontEnd
                      res.send(result);
               })
-              // Get All Products
-              app.get('/allProducts', async (req, res) => {
+              // Post Product Data To DataBase
+              app.post('/products', async (req, res) => {
+                     // Get The Product Data 
+                     const product = req.body;
+                     // Send Product Data To MongoDb
+                     const result = productsCollection.insertOne(product);
+                     // Sent The Response To FrontEnd
+                     res.send(result);
+              })
+              // Get Query Products
+              app.get('/products', async (req, res) => {
                      // Pagination For Products
                      const page = parseInt(req.query.page) || 1;
                      const limit = parseInt(req.query.limit) || 12;
