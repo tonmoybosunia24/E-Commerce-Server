@@ -115,8 +115,22 @@ async function run() {
               })
               // Get Admin Products
               app.get('/adminProducts', verifyToken, verifyAdmin, async (req, res) => {
+                     // Get The Search Input
+                     const search = req.query.search || '';
+                     // Add Query For Stop Unwanted Products
                      const query = { Title: { $exists: true, $ne: '' } };
+                     // Add search filter
+                     if (search && search.trim() !== '') {
+                            query.$or = [
+                                   { Title: { $regex: search.trim(), $options: 'i' } },
+                                   { Category: { $regex: search.trim(), $options: 'i' } },
+                                   { SubCategory: { $regex: search.trim(), $options: 'i' } },
+                                   { Brand: { $regex: search, $options: 'i' } },
+                            ];
+                     }
+                     // Find Products From MongoDb
                      const products = await productsCollection.find(query).toArray();
+                     // Result Send To DataBase
                      res.send(products)
               })
               // Delete Product From DataBase
@@ -143,6 +157,16 @@ async function run() {
                      // Send Data To FrontEnd
                      res.send(product)
               })
+              app.patch('/updateProducts/:id', async (req, res) => {
+                     const id = req.params.id;
+                     const product = req.body
+                     const filter = { _id: new ObjectId(id) };
+                     const updateDoc = {
+                            $set: product,
+                     }
+                     const result = await productsCollection.updateOne(filter, updateDoc)
+                     res.send(result)
+              })
               // Get Query Products
               app.get('/products', async (req, res) => {
                      // Pagination For Products
@@ -161,11 +185,9 @@ async function run() {
                      if (search && search.trim() !== '') {
                             query.$or = [
                                    { Title: { $regex: search.trim(), $options: 'i' } },
+                                   { Category: { $regex: search.trim(), $options: 'i' } },
                                    { SubCategory: { $regex: search.trim(), $options: 'i' } },
-                                   { Title: { $regex: search, $options: 'i' } },
-                                   { SubCategory: { $regex: search, $options: 'i' } },
                                    { Brand: { $regex: search, $options: 'i' } },
-                                   { Description: { $regex: search, $options: 'i' } }
                             ];
                      }
                      // Filters For Products Availability
