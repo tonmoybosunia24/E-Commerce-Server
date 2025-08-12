@@ -32,6 +32,7 @@ async function run() {
               const reviewsCollection = client.db("E-Commerce").collection("reviews");
               const blogsCollection = client.db("E-Commerce").collection("blogs");
               const cartsCollection = client.db("E-Commerce").collection("carts");
+              const wishlistCollection = client.db("E-Commerce").collection("wishlists");
 
               // Jwt Token Post To DataBase
               app.post('/jwt', async (req, res) => {
@@ -352,6 +353,25 @@ async function run() {
                      const result = await cartsCollection.deleteOne(query);
                      // Send Delete Result To FrontEnd
                      res.send(result);
+              })
+              // Post WishList Data To DataBase
+              app.post('/wishlist', async (req, res) => {
+                     // Get The WishList Product
+                     const wishListProduct = req.body;
+                     // Send WishList Data To MongoDb
+                     const result = await wishlistCollection.insertOne(wishListProduct);
+                     // Send The Response To FrontEnd
+                     res.send(result);
+              })
+              app.get('/wishlist', async (req, res) => {
+                     // Get The User Email
+                     const email = req.query.email;
+                     // Find User Email In Mongodb
+                     const query = { email: email };
+                     // Find WishList Product Base On Email
+                     const result = await wishlistCollection.find(query).toArray();
+                     // Send Data To FrontEnd
+                     res.send(result)
               })
               // Send a ping to confirm a successful connection
               await client.db("admin").command({ ping: 1 });
