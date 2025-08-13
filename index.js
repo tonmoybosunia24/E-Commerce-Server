@@ -355,7 +355,7 @@ async function run() {
                      res.send(result);
               })
               // Post WishList Data To DataBase
-              app.post('/wishlist', async (req, res) => {
+              app.post('/wishlist', verifyToken, async (req, res) => {
                      // Get The WishList Product
                      const wishListProduct = req.body;
                      // Send WishList Data To MongoDb
@@ -363,7 +363,8 @@ async function run() {
                      // Send The Response To FrontEnd
                      res.send(result);
               })
-              app.get('/wishlist', async (req, res) => {
+              // Get Wishlist Data From DataBase
+              app.get('/wishlist', verifyToken, async (req, res) => {
                      // Get The User Email
                      const email = req.query.email;
                      // Find User Email In Mongodb
@@ -373,6 +374,17 @@ async function run() {
                      // Send Data To FrontEnd
                      res.send(result)
               })
+              // Delete User Wishlist Data From DatabBase
+              app.delete('/wishlist/:id', async (req, res) => {
+                     // Get Product Id
+                     const id = req.params.id;
+                     // Find Product Id Form Database
+                     const query = { _id: new ObjectId(id) }
+                     // Delete Requested Product 
+                     const result = await wishlistCollection.deleteOne(query);
+                     // Send Result To FrontEnd
+                     res.send(result);
+              });
               // Send a ping to confirm a successful connection
               await client.db("admin").command({ ping: 1 });
               console.log("Pinged your deployment. You successfully connected to MongoDB!");
