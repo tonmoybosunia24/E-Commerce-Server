@@ -67,10 +67,27 @@ async function run() {
                      const query = { email: email };
                      // Get The Email In MongoDb
                      const user = await usersCollection.findOne(query);
-                     // Check The Email That Admin Or Nor
+                     // Check The Email That Admin Or Not
                      const isAdmin = user?.role === 'Admin';
                      // If Not Admin Send A Status Message
                      if (!isAdmin) {
+                            return res.status(403).send({ message: 'Forbidden Access' })
+                     };
+                     // Allow Permission For Go Next
+                     next();
+              }
+              // Verify Moderator For Protected Routes Middleware
+              const verifyModerator = async (req, res, next) => {
+                     // Get The Email From Jwt Token
+                     const email = req.decoded?.email;
+                     // Find The Email In MongoDb
+                     const query = { email: email };
+                     // Get The Email In MongoDb
+                     const user = await usersCollection.findOne(query);
+                     // Check The Email That Admin/Moderator Or Not
+                     const isModeratorOrAdmin = user?.role === 'Admin' || user?.role === 'Moderator';
+                     // If Not Admin Or Moderator Send A Status Message
+                     if (!isModeratorOrAdmin) {
                             return res.status(403).send({ message: 'Forbidden Access' })
                      };
                      // Allow Permission For Go Next
@@ -96,6 +113,25 @@ async function run() {
                      // Send This Data To FrontEnd
                      res.send({ Admin });
               });
+              // Get Moderator Data From DataBase
+              app.get('/moderator/:email', verifyToken, async (req, res) => {
+                     // Get The Users Email
+                     const email = req.params.email;
+                     if (email !== req.decoded?.email) {
+                            return res.status(403).send({ message: 'Unauthorized Access' });
+                     }
+                     // Find The Email From MongoDb
+                     const query = { email: email };
+                     // Get The User From MongoDb
+                     const user = await usersCollection.findOne(query);
+                     // Check The User That Moderator Or Not
+                     let Moderator = false;
+                     if (user) {
+                            Moderator = user?.role === 'Moderator'
+                     };
+                     // Send This Data To FrontEnd
+                     res.send({ Moderator })
+              })
               // Post Users Data To DataBase
               app.post('/users', async (req, res) => {
                      // Get The Users Data
@@ -105,8 +141,52 @@ async function run() {
                      // Sent The Response To FrontEnd
                      res.send(result);
               })
+              // Get Users Data From DataBase
+              app.get('/users', async (req, res) => {
+                     // Get The Search Input
+                     const search = req.query.search || '';
+                     // Define Query
+                     let query = {};
+                     // Add Search Filter
+                     if (search && search.trim() !== '') {
+                            query.$or = [
+                                   { email: { $regex: search.trim(), $options: 'i' } },
+                                   { name: { $regex: search.trim(), $options: 'i' } }
+                            ]
+                     }
+                     // Find Users Form MongoDb
+                     const users = await usersCollection.find(query).toArray();
+                     // Send Data To FrontEnd
+                     res.send(users);
+              });
+              // Delete Users Form DataBase
+              app.delete('/users/:id', async (req, res) => {
+                     const id = req.params.id;
+                     const query = { _id: new ObjectId(id) };
+                     const result = await usersCollection.deleteOne(query);
+                     res.send(result);
+              })
+              // Update User Role From DataBase
+              app.patch('/users/:id', async (req, res) => {
+                     // Get The User Id From FrontEnd
+                     const id = req.params.id;
+                     // Get The Role From FrontEnd
+                     const { role } = req.body;
+                     // FInd The User From MongoDb
+                     const filter = { _id: new ObjectId(id) };
+                     // Find What To Update
+                     const updateDoc = {
+                            $set: {
+                                   role: role,
+                            },
+                     };
+                     // Update The Request Users Role
+                     const result = await usersCollection.updateOne(filter, updateDoc)
+                     // Send Result To FrontEnd
+                     res.send(result)
+              })
               // Post Product Data To DataBase
-              app.post('/products', async (req, res) => {
+              app.post('/products', verifyToken, verifyModerator, async (req, res) => {
                      // Get The Product Data 
                      const product = req.body;
                      // Send Product Data To MongoDb
@@ -114,8 +194,8 @@ async function run() {
                      // Sent The Response To FrontEnd
                      res.send(result);
               })
-              // Get Admin Products
-              app.get('/adminProducts', verifyToken, verifyAdmin, async (req, res) => {
+              // Get Admin Or Moderator Products
+              app.get('/adminProducts', verifyToken, verifyModerator, async (req, res) => {
                      // Get The Search Input
                      const search = req.query.search || '';
                      // Add Query For Stop Unwanted Products
@@ -135,7 +215,7 @@ async function run() {
                      res.send(products)
               })
               // Delete Product From DataBase
-              app.delete('/products/:id', verifyToken, verifyAdmin, async (req, res) => {
+              app.delete('/products/:id', verifyToken, verifyModerator, async (req, res) => {
                      // Get The Carts Id
                      const id = req.params.id;
                      // Find Id In MongoDb
@@ -146,7 +226,7 @@ async function run() {
                      res.send(result);
               })
               // Get Single Product For Update
-              app.get('/updateProducts/:id', async (req, res) => {
+              app.get('/updateProducts/:id', verifyToken, verifyModerator, async (req, res) => {
                      // Get The Update Product Id
                      const id = req.params.id;
                      // Object Id Validation
@@ -158,14 +238,20 @@ async function run() {
                      // Send Data To FrontEnd
                      res.send(product)
               })
-              app.patch('/updateProducts/:id', async (req, res) => {
+              app.patch('/updateProducts/:id', verifyToken, verifyModerator, async (req, res) => {
+                     // Get The Product Id
                      const id = req.params.id;
+                     // Get The Updated Product
                      const product = req.body
+                     // Find The Product Id Form DataBase
                      const filter = { _id: new ObjectId(id) };
+                     // Set The Updated Product In DataBase
                      const updateDoc = {
                             $set: product,
                      }
+                     // Update Updated Product In DataBase
                      const result = await productsCollection.updateOne(filter, updateDoc)
+                     // Send Data To FrontEnd
                      res.send(result)
               })
               // Get Query Products
