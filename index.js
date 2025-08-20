@@ -3,6 +3,8 @@ const app = express();
 require('dotenv').config();
 const cors = require('cors');
 const jwt = require('jsonwebtoken')
+const SSLCommerzPayment = require('sslcommerz-lts')
+const PDFDocument = require('pdfkit');
 const port = process.env.PORT || 5000;
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
@@ -21,6 +23,12 @@ const client = new MongoClient(uri, {
               deprecationErrors: false,
        }
 });
+
+// Ssl Commerce
+const store_id = process.env.STORE_ID;
+const store_passwd = process.env.STORE_PASS
+const is_live = false //true for live, false for sandbox
+
 async function run() {
        try {
               // Connect the client to the server (optional starting in v4.7)
@@ -33,6 +41,7 @@ async function run() {
               const blogsCollection = client.db("E-Commerce").collection("blogs");
               const cartsCollection = client.db("E-Commerce").collection("carts");
               const wishlistCollection = client.db("E-Commerce").collection("wishlists");
+              const ordersCollection = client.db("E-Commerce").collection("orders");
 
               // Jwt Token Post To DataBase
               app.post('/jwt', async (req, res) => {
@@ -139,6 +148,13 @@ async function run() {
                      // Sent Users Data To MongoDb
                      const result = usersCollection.insertOne(user);
                      // Sent The Response To FrontEnd
+                     res.send(result);
+              })
+              // Get Single User From Database
+              app.get('/users/:email', async (req, res) => {
+                     const email = req.params.email;
+                     const query = { email: email };
+                     const result = await usersCollection.findOne(query);
                      res.send(result);
               })
               // Get Users Data From DataBase
@@ -355,6 +371,203 @@ async function run() {
                      // Sending Single Product And Related Product To FrontEnd
                      res.send({ product, relatedProducts });
               })
+              // Post Orders To DataBase
+              app.post('/orders', async (req, res) => {
+                     // Find Order Info From FrontEnd
+                     const orderInfo = req.body;
+                     // Create A New Object Id
+                     const tran_id = new ObjectId().toString();
+                     // Checking Payment Method CashOnDelivery Or Not
+                     if (orderInfo.paymentMethod === 'CashOnDelivery') {
+                            // Add OrderInfo To DataBase
+                            const result = await ordersCollection.insertOne(orderInfo);
+                            // Send Result To FrontEnd
+                            return res.send(result);
+                     };
+                     // Setup Data To SSl Commerce
+                     const data = {
+                            total_amount: orderInfo?.totalAmount,
+                            currency: 'BDT',
+                            tran_id: tran_id,
+                            success_url: `http://localhost:5000/payment/success/${tran_id}`,
+                            fail_url: `http://localhost:5000/payment/fail/${tran_id}`,
+                            cancel_url: 'http://localhost:3030/cancel',
+                            ipn_url: 'http://localhost:3030/ipn',
+                            shipping_method: 'Courier',
+                            product_name: 'Computer.',
+                            product_category: 'Electronic',
+                            product_profile: 'general',
+                            cus_name: orderInfo?.name,
+                            cus_email: orderInfo?.email,
+                            cus_add1: orderInfo?.address,
+                            cus_add2: 'Dhaka',
+                            cus_city: 'Dhaka',
+                            cus_state: 'Dhaka',
+                            cus_postcode: orderInfo?.postCode || '',
+                            cus_country: 'Bangladesh',
+                            cus_phone: orderInfo?.phoneNumber,
+                            cus_fax: '01711111111',
+                            ship_name: orderInfo?.name,
+                            ship_add1: 'Dhaka',
+                            ship_add2: 'Dhaka',
+                            ship_city: 'Dhaka',
+                            ship_state: 'Dhaka',
+                            ship_postcode: 1000,
+                            ship_country: 'Bangladesh',
+                     };
+                     const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live)
+                     sslcz.init(data).then(apiResponse => {
+                            // Create Gateway Url Link
+                            let GatewayPageURL = apiResponse.GatewayPageURL
+                            // Send Redirect Link To FrontEnd
+                            res.send({ url: GatewayPageURL })
+                            // Create Confirm Order Info
+                            const confirmOrder = {
+                                   firstName: orderInfo?.firstName,
+                                   lastName: orderInfo?.lastName,
+                                   name: orderInfo?.name,
+                                   email: orderInfo?.email,
+                                   phoneNumber: orderInfo?.phoneNumber,
+                                   address: orderInfo?.address,
+                                   city: orderInfo?.city,
+                                   division: orderInfo?.division,
+                                   country: orderInfo?.country,
+                                   postCode: orderInfo?.postCode || '',
+                                   paymentMethod: orderInfo?.paymentMethod,
+                                   paymentStatus: "Pending",
+                                   transactionId: tran_id,
+                                   orderItems: orderInfo?.orderItems || [],
+                                   subTotal: orderInfo?.subTotal,
+                                   taxAmount: orderInfo?.taxAmount,
+                                   totalAmount: orderInfo?.totalAmount,
+                                   orderStatus: "Pending",
+                                   deliveryStatus: "Pending",
+                                   placeAt: new Date().toISOString()
+                            };
+                            // Add Final Order Info To Database
+                            const result = ordersCollection.insertOne(confirmOrder);
+                     });
+              })
+              // Payment Success Url
+              app.post('/payment/success/:tranId', async (req, res) => {
+                     // Get The Tran Id From Params
+                     const tranId = req.params.tranId;
+                     // Update Product Payment & Order Status
+                     const result = await ordersCollection.findOneAndUpdate({ transactionId: tranId }, { $set: { paymentStatus: 'Paid', orderStatus: "Confirmed" } }, { returnDocument: "after" });
+                     // Get The Result
+                     if (result) {
+                            // Get The Order Id From Result
+                            const orderId = result?._id?.toString();
+                            // Redirect To Checkout Page & Send Order Id In Params
+                            res.redirect(`http://localhost:5173/checkOut?success=${orderId}`);
+                     }
+              });
+              // Payment Fail Url
+              app.post('/payment/fail/:tranId', async (req, res) => {
+                     // Get The Tran Id From Params
+                     const tranId = req.params.tranId;
+                     // Delete Confirm Order When Order Fail
+                     const result = await ordersCollection.deleteOne({ "transactionId": tranId });
+                     // Check The Result
+                     if (result.deletedCount > 0) {
+                            // Redirect To Checkout Page & Send Fail Params
+                            res.redirect(`http://localhost:5173/checkOut?failed=true`)
+                     }
+              });
+              // Create Invoice Api
+              app.get('/invoice/:orderId', async (req, res) => {
+                     try {
+                            const orderId = req.params.orderId;
+                            const order = await ordersCollection.findOne({ _id: new ObjectId(orderId) });
+                            if (!order) return res.status(404).send('Order not found');
+                            const doc = new PDFDocument({ margin: 50 });
+                            res.setHeader('Content-Type', 'application/pdf');
+                            res.setHeader('Content-Disposition', `attachment; filename=invoice_${orderId}.pdf`);
+                            doc.pipe(res);
+                            const themeColor = "#ff5252"; // 🎨 Theme color
+                            const lightBg = "#F5F0F0";    // Light shade for table rows / box
+                            const pageWidth = doc.page.width; // ✅ dynamic width
+                            // ====== HEADER BAR ======
+                            doc.rect(0, 0, pageWidth, 80).fill(themeColor);
+                            doc.fillColor("#FFF").fontSize(22).text("Classy Shop", 50, 30);
+                            doc.fontSize(18).fillColor("#FFF").text("INVOICE", 0, 30, { align: "right" });
+                            doc.moveDown(3);
+                            // ====== INVOICE META ======
+                            doc.fontSize(10).fillColor("#333");
+                            doc.text(`Invoice ID: ${orderId}`, 50, 100);
+                            doc.text(`Date: ${new Date().toLocaleDateString()}`, 50, 115);
+                            // ====== CUSTOMER & SELLER INFO ======
+                            doc.roundedRect(50, 140, 230, 100, 5).stroke(themeColor);
+                            doc.roundedRect(320, 140, 230, 100, 5).stroke(themeColor);
+                            doc.fontSize(12).fillColor(themeColor).text("Bill To:", 60, 150);
+                            doc.fillColor("#000").fontSize(11)
+                                   .text(order.name, 60, 170)
+                                   .text(order.email, 60, 185)
+                                   .text(order.phoneNumber, 60, 200)
+                                   .text(`${order.address}, ${order.city}`, 60, 215);
+
+                            doc.fillColor(themeColor).fontSize(12).text("Seller Info:", 330, 150);
+                            doc.fillColor("#000").fontSize(11)
+                                   .text("Classy Shop Ltd.", 330, 170)
+                                   .text("mdtonmoybosunia24@gmail.com", 330, 185)
+                                   .text("+8801780259656", 330, 200)
+                                   .text("Dinajpur, Bangladesh", 330, 215);
+
+                            // ====== ORDER ITEMS TABLE ======
+                            let y = 270;
+                            // Header Row
+                            doc.rect(50, y, pageWidth - 100, 25).fill(themeColor);
+                            doc.fillColor("#FFF").fontSize(11)
+                                   .text("Product", 60, y + 7)
+                                   .text("Qty", 300, y + 7, { width: 50, align: "center" })
+                                   .text("Price", 370, y + 7, { width: 80, align: "right" })
+                                   .text("Total", 460, y + 7, { width: 80, align: "right" });
+
+                            y += 25;
+                            // Rows with zebra striping
+                            order.orderItems.forEach((item, idx) => {
+                                   if (idx % 2 === 0) {
+                                          doc.rect(50, y, pageWidth - 100, 20).fill(lightBg);
+                                   } else {
+                                          doc.rect(50, y, pageWidth - 100, 20).fill("#FFF");
+                                   }
+                                   doc.fillColor("#000").fontSize(10);
+                                   doc.text(item.productName, 60, y + 5);
+                                   doc.text(item.quantity, 300, y + 5, { width: 50, align: "center" });
+                                   doc.text(`${item.price} BDT`, 370, y + 5, { width: 80, align: "right" });
+                                   doc.text(`${item.price * item.quantity} BDT`, 460, y + 5, { width: 80, align: "right" });
+                                   y += 20;
+                            });
+                            // ====== TOTALS BOX ======
+                            y += 15;
+                            doc.roundedRect(330, y, 220, 70, 5).fill(lightBg);
+                            let boxX = 330;
+                            let boxW = 220;
+                            doc.fontSize(11).fillColor("#000");
+                            // Subtotal
+                            doc.text("Subtotal:", boxX + 10, y + 10, { align: "left" });
+                            doc.text(`${order.subTotal} BDT`, boxX + 10, y + 10, { width: boxW - 20, align: "right" });
+                            // Tax
+                            doc.text("Tax:", boxX + 10, y + 25, { align: "left" });
+                            doc.text(`${order.taxAmount} BDT`, boxX + 10, y + 25, { width: boxW - 20, align: "right" });
+                            // Grand Total
+                            doc.fontSize(12).fillColor(themeColor);
+                            doc.text("Total (Tax Incl.):", boxX + 10, y + 45, { align: "left" });
+                            doc.text(`${order.totalAmount} BDT`, boxX + 10, y + 45, { width: boxW - 20, align: "right" });
+                            // ====== FOOTER ======
+                            doc.moveDown(4);
+                            doc.strokeColor(lightBg).lineWidth(1).moveTo(50, 700).lineTo(pageWidth - 50, 700).stroke();
+                            doc.fontSize(10).fillColor("#666").text("Thank you For Shopping With Classy Shop", 0, 710, { align: "center" });
+                            doc.text("For Support Contact: mdtonmoybosunia24@gmail.com", 0, 725, { align: "center" });
+                            doc.end();
+
+                     } catch (err) {
+                            console.error(err);
+                            if (!res.headersSent) {
+                                   res.status(500).send('Server Error');
+                            }
+                     }
+              });
               // Get All Category 
               app.get('/categories', async (req, res) => {
                      // Find All Category
@@ -438,6 +651,17 @@ async function run() {
                      // Send Data For Delete Card
                      const result = await cartsCollection.deleteOne(query);
                      // Send Delete Result To FrontEnd
+                     res.send(result);
+              })
+              // Delete Full Users Cart Data
+              app.delete('/userCarts/:email', async (req, res) => {
+                     // Get The User Email
+                     const email = req.params.email;
+                     // Find The Email In DataBase
+                     const query = { email: email }
+                     // Delete Carts Data By User Email
+                     const result = await cartsCollection.deleteMany(query)
+                     // Send Result To Frontend
                      res.send(result);
               })
               // Post WishList Data To DataBase
