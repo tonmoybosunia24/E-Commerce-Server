@@ -695,6 +695,48 @@ async function run() {
                      // Send Result To FrontEnd
                      res.send(result);
               });
+              // Get Orders Data From DataBase
+              app.get('/orders', verifyToken, verifyModerator, async (req, res) => {
+                     // Get The Search Query
+                     const search = req.query.search || ''
+                     // Get Query For For Order Sorting
+                     const query = {}
+                     // Set Search Result In Query
+                     if (search && search.trim() !== '') {
+                            query.$or = [
+                                   { name: { $regex: search, $options: 'i' } },
+                                   { 'orderItems.productName': { $regex: search, $options: 'i' } },
+                                   { paymentMethod: { $regex: search, $options: "i" } },
+                            ]
+                     }
+                     // Get The Pages From Frontend
+                     const page = parseInt(req.query.page) || 1;
+                     // Get The Order Limit From Frontend
+                     const limit = parseInt(req.query.limit) || 12;
+                     // Skip For Orders By Page
+                     const skip = (page - 1) * limit;
+                     // Find Orders From DataBase
+                     const orders = await ordersCollection.find(query).sort({ placeAt: -1 }).skip(skip).limit(limit).toArray();
+                     // Get The Total Order Counts
+                     const totalOrders = await ordersCollection.countDocuments(query);
+                     // Send The Result For DataBase
+                     res.send({ orders, totalPages: Math.ceil(totalOrders / limit), currentPage: page, limit, totalOrders });
+              });
+              // Update Orders Status From Database
+              app.patch('/orders/:id', verifyToken, verifyModerator, async (req, res) => {
+                     // Get The Id From Database
+                     const id = req.params.id;
+                     // Get The Update Data From Database
+                     const updatedData = req.body;
+                     // Find Id In Database
+                     const filter = { _id: new ObjectId(id) }
+                     // Set Updated Data
+                     const updateDoc = { $set: updatedData };
+                     // Update Data In Database
+                     const result = await ordersCollection.updateOne(filter, updateDoc)
+                     // Send Update Result To Frontend
+                     res.send(result)
+              })
               // Send a ping to confirm a successful connection
               await client.db("admin").command({ ping: 1 });
               console.log("Pinged your deployment. You successfully connected to MongoDB!");
