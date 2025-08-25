@@ -157,6 +157,23 @@ async function run() {
                      const result = await usersCollection.findOne(query);
                      res.send(result);
               })
+              // Update Single User Data From DataBase
+              app.patch('/updateUserInfo/:id', async (req, res) => {
+                     // Get The User Id
+                     const id = req.params.id;
+                     // Get The Update User Data
+                     const updatedUserInfo = req.body;
+                     // Find The Id From DataBase
+                     const filter = { _id: new ObjectId(id) };
+                     // Set The Updated Data
+                     const updateDoc = {
+                            $set: updatedUserInfo,
+                     };
+                     // Set The Updated User Data To DataBase
+                     const result = await usersCollection.updateOne(filter, updateDoc);
+                     // Send The Result To FrontEnd
+                     res.send(result);
+              })
               // Get Users Data From DataBase
               app.get('/users', async (req, res) => {
                      // Get The Search Input
@@ -258,7 +275,7 @@ async function run() {
                      // Get The Product Id
                      const id = req.params.id;
                      // Get The Updated Product
-                     const product = req.body
+                     const product = req.body;
                      // Find The Product Id Form DataBase
                      const filter = { _id: new ObjectId(id) };
                      // Set The Updated Product In DataBase
@@ -695,6 +712,17 @@ async function run() {
                      // Send Result To FrontEnd
                      res.send(result);
               });
+              // Get User Orders Data From DataBase
+              app.get('/userOrder', async (req, res) => {
+                     // Get The User Email
+                     const email = req.query.email;
+                     // Find The Email From DataBase
+                     const query = { email: email }
+                     // Get User Order Data From DataBase
+                     const result = await ordersCollection.find(query).sort({ placeAt: -1 }).toArray();
+                     // Send Ta Result To FrontEnd
+                     res.send(result);
+              })
               // Get Orders Data From DataBase
               app.get('/orders', verifyToken, verifyModerator, async (req, res) => {
                      // Get The Search Query
