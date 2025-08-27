@@ -691,10 +691,25 @@ async function run() {
               })
               // Get All Blogs
               app.get('/blogs', async (req, res) => {
+                     // Get The Limit
+                     const limit = parseInt(req.query.limit) || 6;
+                     // Get The Total Blogs Length
+                     const totalBlogs = await blogsCollection.countDocuments();
                      // Find ALl The Blogs
-                     const blogs = await blogsCollection.find().toArray();
+                     const blogs = await blogsCollection.find().limit(limit).toArray();
                      // Send Blogs To FrontEnd
-                     res.send(blogs);
+                     res.send({ blogs, totalBlogs });
+              })
+              // Get Single Blog
+              app.get('/singleBLog/:id', async (req, res) => {
+                     // Get The Id
+                     const id = req.params.id;
+                     // Find The Id In DataBase
+                     const query = { _id: new ObjectId(id) }
+                     // Find The Blog From DataBase
+                     const result = await blogsCollection.find(query).toArray();
+                     // Send The Result To FrontEnd
+                     res.send(result)
               })
               // Get Users Carts Data
               app.get('/carts', verifyToken, async (req, res) => {
