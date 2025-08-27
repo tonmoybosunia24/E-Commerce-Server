@@ -102,6 +102,81 @@ async function run() {
                      // Allow Permission For Go Next
                      next();
               }
+              // Get The Admin Stats Or Analytics
+              app.get('/adminStats', verifyToken, verifyAdmin, async (req, res) => {
+                     // Get The Total Users
+                     const users = await usersCollection.estimatedDocumentCount();
+                     // Get The Total Products
+                     const products = await productsCollection.estimatedDocumentCount();
+                     // Get The Total Orders
+                     const orders = await ordersCollection.estimatedDocumentCount();
+                     // Find The Total Revenue
+                     const result = await ordersCollection.aggregate([
+                            {
+                                   $group: {
+                                          _id: null,
+                                          totalRevenue: { $sum: "$totalAmount" }
+                                   }
+                            }
+                     ]).toArray();
+                     // Get The Total Revenue
+                     const totalRevenue = result.length > 0 ? result[0].totalRevenue : 0;
+                     // Get The Total Revenue By Payment-Method
+                     const statusWise = await ordersCollection.aggregate([
+                            {
+                                   $group: {
+                                          _id: "$paymentMethod",
+                                          totalRevenue: { $sum: "$totalAmount" },
+                                          totalOrders: { $sum: 1 }
+                                   }
+                            }
+                     ]).toArray();
+                     // Send The Result To Frontend
+                     res.send({ totalRevenue, users, products, orders, statusWise })
+              })
+              // Get The Admin Chart Data
+              app.get('/adminChartData', verifyToken, verifyAdmin, async (req, res) => {
+                     try {
+                            // Get The Monthly Sales Report (6 Months)
+                            const monthlySales = await ordersCollection.aggregate([
+                                   {
+                                          $group: {
+                                                 _id: {
+                                                        year: { $year: { $toDate: "$placeAt" } },
+                                                        month: { $month: { $toDate: "$placeAt" } }
+                                                 },
+                                                 totalRevenue: { $sum: "$totalAmount" },
+                                                 totalOrders: { $sum: 1 }
+                                          }
+                                   },
+                                   { $sort: { "_id.year": 1, "_id.month": 1 } },
+                                   { $limit: 6 }
+                            ]).toArray();
+                            // Get The Payment Method Report
+                            const paymentMethods = await ordersCollection.aggregate([
+                                   {
+                                          $group: {
+                                                 _id: "$paymentMethod",
+                                                 totalRevenue: { $sum: "$totalAmount" },
+                                                 totalOrders: { $sum: 1 }
+                                          }
+                                   }
+                            ]).toArray();
+                            // Get The ORder Distribution Report
+                            const orderStatus = await ordersCollection.aggregate([
+                                   {
+                                          $group: {
+                                                 _id: "$orderStatus",
+                                                 totalOrders: { $sum: 1 }
+                                          }
+                                   }
+                            ]).toArray();
+                            // Send The Result To Frontend
+                            res.send({ monthlySales, paymentMethods, orderStatus });
+                     } catch (error) {
+                            res.status(500).send({ message: "Something went wrong" });
+                     }
+              });
               // Get Admin Data From DataBase
               app.get('/admin/:email', verifyToken, async (req, res) => {
                      // Get The Users Email
