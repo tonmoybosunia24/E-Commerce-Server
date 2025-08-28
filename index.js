@@ -7,6 +7,7 @@ const SSLCommerzPayment = require('sslcommerz-lts')
 const PDFDocument = require('pdfkit');
 const port = process.env.PORT || 5000;
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const nodemailer = require("nodemailer");
 
 // Middleware
 app.use(express.json());
@@ -854,6 +855,33 @@ async function run() {
                      const result = await ordersCollection.updateOne(filter, updateDoc)
                      // Send Update Result To Frontend
                      res.send(result)
+              })
+              // Send Contact Info By Sending Email
+              app.post('/sendEmail', async (req, res) => {
+                     // Get The Contact From Data
+                     const { Fullname, Email, PhoneNumber, Description } = req.body;
+                     // Create A Email Transporter
+                     const transporter = nodemailer.createTransport({
+                            service: "gmail",
+                            auth: {
+                                   user: process.env.EMAIL_USER,
+                                   pass: process.env.EMAIL_PASS,
+                            },
+                     });
+                     // Configure The Email
+                     const mailOption = {
+                            from: Email,
+                            to: process.env.EMAIL_USER,
+                            subject: "E-Commerce Contact From Submit",
+                            text: `Name: ${Fullname}\nEmail: ${Email}\nPhone: ${PhoneNumber}\nMessage: ${Description}`,
+                     };
+                     // Send The Email
+                     try {
+                            await transporter.sendMail(mailOption);
+                            res.status(200).json({ success: true, message: "Email sent successfully!" });
+                     } catch (error) {
+                            res.status(500).json({ success: false, message: "Failed to send email", error });
+                     }
               })
               // Send a ping to confirm a successful connection
               await client.db("admin").command({ ping: 1 });
