@@ -386,10 +386,16 @@ async function run() {
                                    { Brand: { $regex: search, $options: 'i' } },
                             ];
                      }
-                     // Filters For Products Availability
-                     if (req.query.availability) {
-                            const availabilityValues = req.query.availability.split(',');
-                            query.AvailabilityStatus = { $in: availabilityValues };
+                     if (req.query.stockFilter) {
+                            const stockFilters = req.query.stockFilter.split(',');
+                            const stockQuery = [];
+                            stockFilters.forEach(filter => {
+                                   if (filter === 'in-stock') stockQuery.push({ Stock: { $gt: 50 } });
+                                   if (filter === 'limited-stock') stockQuery.push({ Stock: { $gt: 0, $lte: 50 } });
+                                   if (filter === 'out-of-stock') stockQuery.push({ Stock: 0 });
+                            });
+                            query.$and = query.$and || [];
+                            query.$and.push({ $or: stockQuery });
                      }
                      // Filters For Products Size
                      if (req.query.size) {
@@ -424,11 +430,11 @@ async function run() {
                             });
                      }
                      // Dynamic Counts For Availability
-                     const availabilityOptions = ['In Stock', 'Limited Stock', 'Not Available'];
-                     const availabilityCounts = {};
-                     for (const status of availabilityOptions) {
-                            availabilityCounts[status] = await productsCollection.countDocuments({ AvailabilityStatus: status });
-                     }
+                     const stockCounts = {
+                            'In Stock': await productsCollection.countDocuments({ ...query, Stock: { $gt: 50 } }),
+                            'Limited Stock': await productsCollection.countDocuments({ ...query, Stock: { $gt: 0, $lte: 50 } }),
+                            'Not Available': await productsCollection.countDocuments({ ...query, Stock: { $eq: 0 } }),
+                     };
                      // Dynamic Counts For Colors
                      const colorOptions = ['#FF0000', '#000000', '#FFFFFF', '#CCCCCC'];
                      const colorCounts = {};
@@ -444,7 +450,7 @@ async function run() {
                      // All Products Sending To FrontEnd
                      const allProducts = await productsCollection.find(query).sort(sortOption).skip(skip).limit(limit).toArray();
                      const total = await productsCollection.countDocuments(query)
-                     res.send({ allProducts, totalPages: Math.ceil(total / limit), currentPage: page, limit, counts: { size: sizeCounts, availability: availabilityCounts, color: colorCounts, brands: brandsCounts } });
+                     res.send({ allProducts, totalPages: Math.ceil(total / limit), currentPage: page, limit, counts: { size: sizeCounts, stockCounts: stockCounts, color: colorCounts, brands: brandsCounts } });
               })
               // Get Single Product With Related Products
               app.get('/productDetails/:id', async (req, res) => {
@@ -468,10 +474,27 @@ async function run() {
               app.post('/orders', async (req, res) => {
                      // Find Order Info From FrontEnd
                      const orderInfo = req.body;
+                     // Get The Order Items
+                     const orderItems = orderInfo?.orderItems;
                      // Create A New Object Id
                      const tran_id = new ObjectId().toString();
                      // Checking Payment Method CashOnDelivery Or Not
                      if (orderInfo.paymentMethod === 'CashOnDelivery') {
+                            // Start Loop For Find Individual Order Product
+                            for (const item of orderItems) {
+                                   // Decrease The Stock When Order From Cash On Delivery
+                                   const result = await productsCollection.updateOne(
+                                          { _id: new ObjectId(item.productId), Stock: { $gte: item.quantity } },
+                                          { $inc: { Stock: -item.quantity } }
+                                   );
+                                   // Check The Update Status
+                                   if (result.modifiedCount === 0) {
+                                          return res.status(400).json({
+                                                 success: false,
+                                                 message: `Insufficient Stock For ${item.productName}`,
+                                          });
+                                   }
+                            }
                             // Add OrderInfo To DataBase
                             const result = await ordersCollection.insertOne(orderInfo);
                             // Send Result To FrontEnd
@@ -545,6 +568,22 @@ async function run() {
               app.post('/payment/success/:tranId', async (req, res) => {
                      // Get The Tran Id From Params
                      const tranId = req.params.tranId;
+                     // Get The Ordered Products
+                     const order = await ordersCollection.findOne({ transactionId: tranId });
+                     // Get The Order Items
+                     const orderItems = order.orderItems;
+                     // Start Loop For Find Individual Order Product
+                     for (const item of orderItems) {
+                            // Decrease The Stock When Order From Online Payment
+                            const result = await productsCollection.updateOne(
+                                   { _id: new ObjectId(item.productId), Stock: { $gte: item.quantity } },
+                                   { $inc: { Stock: -item.quantity } }
+                            );
+                            // Check The Update Status
+                            if (result.modifiedCount === 0) {
+                                   return res.status(400).send(`Insufficient Stock for ${item.productName}`);
+                            }
+                     }
                      // Update Product Payment & Order Status
                      const result = await ordersCollection.findOneAndUpdate({ transactionId: tranId }, { $set: { paymentStatus: 'Paid', orderStatus: "Confirmed" } }, { returnDocument: "after" });
                      // Get The Result
