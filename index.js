@@ -386,6 +386,7 @@ async function run() {
                                    { Brand: { $regex: search, $options: 'i' } },
                             ];
                      }
+                     // Filter For Product Availability
                      if (req.query.stockFilter) {
                             const stockFilters = req.query.stockFilter.split(',');
                             const stockQuery = [];
@@ -401,11 +402,6 @@ async function run() {
                      if (req.query.size) {
                             const sizeValues = req.query.size.split(',');
                             query.Variant = { $in: sizeValues };
-                     }
-                     // Filters For Products Color
-                     if (req.query.color) {
-                            const colorValues = req.query.color.split(',');
-                            query.Colors = { $in: colorValues };
                      }
                      // Filters For Products Price Slider
                      if (req.query.minPrice && req.query.maxPrice) {
@@ -435,11 +431,11 @@ async function run() {
                             'Limited Stock': await productsCollection.countDocuments({ ...query, Stock: { $gt: 0, $lte: 50 } }),
                             'Not Available': await productsCollection.countDocuments({ ...query, Stock: { $eq: 0 } }),
                      };
-                     // Dynamic Counts For Colors
-                     const colorOptions = ['#FF0000', '#000000', '#FFFFFF', '#CCCCCC'];
-                     const colorCounts = {};
-                     for (const color of colorOptions) {
-                            colorCounts[color] = await productsCollection.countDocuments({ Colors: color });
+                     // Dynamic Counts For Categories
+                     const categoryOptions = await productsCollection.distinct("Category");
+                     const categoryCounts = {};
+                     for (const category of categoryOptions) {
+                            categoryCounts[category] = await productsCollection.countDocuments({ Category: category });
                      }
                      // Dynamic Counts For Brand
                      const brandsOptions = ['Apple', 'Samsung', 'Sony', 'Nike'];
@@ -450,7 +446,7 @@ async function run() {
                      // All Products Sending To FrontEnd
                      const allProducts = await productsCollection.find(query).sort(sortOption).skip(skip).limit(limit).toArray();
                      const total = await productsCollection.countDocuments(query)
-                     res.send({ allProducts, totalPages: Math.ceil(total / limit), currentPage: page, limit, counts: { size: sizeCounts, stockCounts: stockCounts, color: colorCounts, brands: brandsCounts } });
+                     res.send({ allProducts, totalPages: Math.ceil(total / limit), currentPage: page, limit, counts: { size: sizeCounts, stockCounts: stockCounts, category: categoryCounts, brands: brandsCounts } });
               })
               // Get Single Product With Related Products
               app.get('/productDetails/:id', async (req, res) => {
