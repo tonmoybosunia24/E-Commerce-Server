@@ -603,97 +603,121 @@ async function run() {
                      }
               });
               // Create Invoice Api
-              app.get('/invoice/:orderId', async (req, res) => {
+              app.get("/invoice/:orderId", async (req, res) => {
                      try {
                             const orderId = req.params.orderId;
                             const order = await ordersCollection.findOne({ _id: new ObjectId(orderId) });
-                            if (!order) return res.status(404).send('Order not found');
+                            if (!order) return res.status(404).send("Order not found");
                             const doc = new PDFDocument({ margin: 50 });
-                            res.setHeader('Content-Type', 'application/pdf');
-                            res.setHeader('Content-Disposition', `attachment; filename=invoice_${orderId}.pdf`);
+                            res.setHeader("Content-Type", "application/pdf");
+                            res.setHeader(
+                                   "Content-Disposition",
+                                   `attachment; filename=invoice_${orderId}.pdf`
+                            );
                             doc.pipe(res);
-                            const themeColor = "#ff5252"; // 🎨 Theme color
-                            const lightBg = "#F5F0F0";    // Light shade for table rows / box
-                            const pageWidth = doc.page.width; // ✅ dynamic width
-                            // ====== HEADER BAR ======
+                            const themeColor = "#ff5252";
+                            const lightBg = "#F5F0F0";
+                            const pageWidth = doc.page.width;
+                            // ===== HEADER =====
                             doc.rect(0, 0, pageWidth, 80).fill(themeColor);
                             doc.fillColor("#FFF").fontSize(22).text("Classy Shop", 50, 30);
-                            doc.fontSize(18).fillColor("#FFF").text("INVOICE", 0, 30, { align: "right" });
+                            doc.fontSize(18).text("INVOICE", 0, 30, { align: "right" });
+                            // ===== INVOICE META =====
                             doc.moveDown(3);
-                            // ====== INVOICE META ======
                             doc.fontSize(10).fillColor("#333");
                             doc.text(`Invoice ID: ${orderId}`, 50, 100);
-                            doc.text(`Date: ${new Date().toLocaleDateString()}`, 50, 115);
-                            // ====== CUSTOMER & SELLER INFO ======
-                            doc.roundedRect(50, 140, 230, 100, 5).stroke(themeColor);
-                            doc.roundedRect(320, 140, 230, 100, 5).stroke(themeColor);
+                            doc.text(`Order Date: ${new Date(order.placeAt).toLocaleDateString()}`, 50, 115);
+                            // ===== CUSTOMER INFO =====
+                            const infoBoxHeight = 130;
+                            doc.roundedRect(50, 140, 230, infoBoxHeight, 5).stroke(themeColor);
                             doc.fontSize(12).fillColor(themeColor).text("Bill To:", 60, 150);
+                            let customerY = 170;
+                            const gap = 14;
                             doc.fillColor("#000").fontSize(11)
-                                   .text(order.name, 60, 170)
-                                   .text(order.email, 60, 185)
-                                   .text(order.phoneNumber, 60, 200)
-                                   .text(`${order.address}, ${order.city}`, 60, 215);
-
+                                   .text(order.name, 60, customerY)
+                                   .text(order.email, 60, customerY + gap)
+                                   .text(order.phoneNumber, 60, customerY + gap * 2)
+                                   .text(`${order.address}, ${order.city}`, 60, customerY + gap * 3)
+                                   .text(`${order.division}, ${order.country}`, 60, customerY + gap * 4)
+                                   .text(`Post Code: ${order.postCode}`, 60, customerY + gap * 5);
+                            // ===== SELLER INFO =====
+                            doc.roundedRect(320, 140, 230, infoBoxHeight, 5).stroke(themeColor);
                             doc.fillColor(themeColor).fontSize(12).text("Seller Info:", 330, 150);
+                            let sellerY = 170;
                             doc.fillColor("#000").fontSize(11)
-                                   .text("Classy Shop Ltd.", 330, 170)
-                                   .text("mdtonmoybosunia24@gmail.com", 330, 185)
-                                   .text("+8801780259656", 330, 200)
-                                   .text("Dinajpur, Bangladesh", 330, 215);
-
-                            // ====== ORDER ITEMS TABLE ======
-                            let y = 270;
-                            // Header Row
+                                   .text("Classy Shop Ltd.", 330, sellerY)
+                                   .text("mdtonmoybosunia24@gmail.com", 330, sellerY + gap)
+                                   .text("+8801780259656", 330, sellerY + gap * 2)
+                                   .text("Dinajpur, Bangladesh", 330, sellerY + gap * 3);
+                            // ===== ORDER INFORMATION =====
+                            const orderInfoStartY = 290;
+                            const orderInfoGap = 15;
+                            const leftX = 60;
+                            const rightX = 300;
+                            const orderInfoHeight = 150;
+                            doc.roundedRect(50, orderInfoStartY, pageWidth - 100, orderInfoHeight, 5).stroke(themeColor);
+                            doc.fontSize(12).fillColor(themeColor).text("Order Information:", leftX, orderInfoStartY + 10);
+                            let infoY = orderInfoStartY + 30;
+                            // left side info
+                            doc.fontSize(11).fillColor("#000")
+                                   .text(`Customer Name: ${order.name}`, leftX, infoY)
+                                   .text(`Email: ${order.email}`, leftX, infoY + orderInfoGap)
+                                   .text(`Customer Phone: ${order.phoneNumber}`, leftX, infoY + orderInfoGap * 2)
+                                   .text(`City: ${order.city}`, leftX, infoY + orderInfoGap * 3)
+                                   .text(`Division: ${order.division}`, leftX, infoY + orderInfoGap * 4)
+                                   .text(`Country: ${order.country}`, leftX, infoY + orderInfoGap * 5)
+                                   .text(`Post Code: ${order.postCode}`, leftX, infoY + orderInfoGap * 6);
+                            // right side info (Delivery Status + new info)
+                            doc.text(`Delivery Status: ${order.deliveryStatus || "Pending"}`, rightX, infoY)
+                                   .text(`Total Items: ${order.orderItems.length}`, rightX, infoY + orderInfoGap)
+                                   .text(`Payment Method: ${order.paymentMethod || "N/A"}`, rightX, infoY + orderInfoGap * 2)
+                                   .text(`Payment Status: ${order.paymentStatus || "Pending"}`, rightX, infoY + orderInfoGap * 3)
+                                   .text(`Transaction ID: ${order.transactionId || "N/A"}`, rightX, infoY + orderInfoGap * 4);
+                            // ===== ORDER ITEMS TABLE =====
+                            let y = orderInfoStartY + orderInfoHeight + 20;
                             doc.rect(50, y, pageWidth - 100, 25).fill(themeColor);
                             doc.fillColor("#FFF").fontSize(11)
                                    .text("Product", 60, y + 7)
                                    .text("Qty", 300, y + 7, { width: 50, align: "center" })
                                    .text("Price", 370, y + 7, { width: 80, align: "right" })
                                    .text("Total", 460, y + 7, { width: 80, align: "right" });
-
                             y += 25;
-                            // Rows with zebra striping
                             order.orderItems.forEach((item, idx) => {
-                                   if (idx % 2 === 0) {
-                                          doc.rect(50, y, pageWidth - 100, 20).fill(lightBg);
-                                   } else {
-                                          doc.rect(50, y, pageWidth - 100, 20).fill("#FFF");
-                                   }
+                                   doc.rect(50, y, pageWidth - 100, 20).fill(idx % 2 === 0 ? lightBg : "#FFF");
                                    doc.fillColor("#000").fontSize(10);
                                    doc.text(item.productName, 60, y + 5);
                                    doc.text(item.quantity, 300, y + 5, { width: 50, align: "center" });
-                                   doc.text(`${item.price} BDT`, 370, y + 5, { width: 80, align: "right" });
-                                   doc.text(`${item.price * item.quantity} BDT`, 460, y + 5, { width: 80, align: "right" });
+                                   doc.text(`${item.price.toFixed(2)} BDT`, 370, y + 5, { width: 80, align: "right" });
+                                   doc.text(`${(item.price * item.quantity).toFixed(2)} BDT`, 460, y + 5, { width: 80, align: "right" });
                                    y += 20;
                             });
-                            // ====== TOTALS BOX ======
+                            // ===== TOTALS BOX =====
                             y += 15;
-                            doc.roundedRect(330, y, 220, 70, 5).fill(lightBg);
-                            let boxX = 330;
-                            let boxW = 220;
+                            const totalsBoxHeight = 80;
+                            doc.roundedRect(330, y, 220, totalsBoxHeight, 5).fill(lightBg);
+                            const boxX = 330, boxW = 220;
                             doc.fontSize(11).fillColor("#000");
-                            // Subtotal
-                            doc.text("Subtotal:", boxX + 10, y + 10, { align: "left" });
-                            doc.text(`${order.subTotal} BDT`, boxX + 10, y + 10, { width: boxW - 20, align: "right" });
-                            // Tax
-                            doc.text("Tax:", boxX + 10, y + 25, { align: "left" });
-                            doc.text(`${order.taxAmount} BDT`, boxX + 10, y + 25, { width: boxW - 20, align: "right" });
-                            // Grand Total
+                            doc.text("Subtotal:", boxX + 10, y + 10);
+                            doc.text(`${order.subTotal.toFixed(2)} BDT`, boxX + 10, y + 10, { width: boxW - 20, align: "right" });
+                            doc.text("Tax:", boxX + 10, y + 25);
+                            doc.text(`${order.taxAmount.toFixed(2)} BDT`, boxX + 10, y + 25, { width: boxW - 20, align: "right" });
                             doc.fontSize(12).fillColor(themeColor);
-                            doc.text("Total (Tax Incl.):", boxX + 10, y + 45, { align: "left" });
-                            doc.text(`${order.totalAmount} BDT`, boxX + 10, y + 45, { width: boxW - 20, align: "right" });
-                            // ====== FOOTER ======
-                            doc.moveDown(4);
-                            doc.strokeColor(lightBg).lineWidth(1).moveTo(50, 700).lineTo(pageWidth - 50, 700).stroke();
-                            doc.fontSize(10).fillColor("#666").text("Thank you For Shopping With Classy Shop", 0, 710, { align: "center" });
-                            doc.text("For Support Contact: mdtonmoybosunia24@gmail.com", 0, 725, { align: "center" });
+                            doc.text("Total (Tax Incl.):", boxX + 10, y + 45);
+                            doc.text(`${order.totalAmount.toFixed(2)} BDT`, boxX + 10, y + 45, { width: boxW - 20, align: "right" });
+                            // ===== FOOTER =====
+                            // ===== FOOTER =====
+                            const footerY = doc.page.height - 40; // সবসময় current page bottom থেকে 40pt উপরে
+                            doc.strokeColor(lightBg).lineWidth(1).moveTo(50, footerY - 10).lineTo(pageWidth - 50, footerY - 10).stroke();
+                            doc.fontSize(10).fillColor("#666")
+                                   .text("Thank you for shopping with Classy Shop", 0, footerY, { align: "center" })
+                                   .text("For support contact: mdtonmoybosunia24@gmail.com", 0, footerY + 15, { align: "center" });
+
+
                             doc.end();
 
                      } catch (err) {
                             console.error(err);
-                            if (!res.headersSent) {
-                                   res.status(500).send('Server Error');
-                            }
+                            if (!res.headersSent) res.status(500).send("Server Error");
                      }
               });
               // Get All Category 
