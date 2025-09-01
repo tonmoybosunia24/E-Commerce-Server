@@ -33,7 +33,7 @@ const is_live = false //true for live, false for sandbox
 async function run() {
        try {
               // Connect the client to the server (optional starting in v4.7)
-              await client.connect();
+              // await client.connect();
 
               // MongoDb Database Collections
               const usersCollection = client.db("E-Commerce").collection("users");
@@ -150,9 +150,10 @@ async function run() {
                                                  totalOrders: { $sum: 1 }
                                           }
                                    },
-                                   { $sort: { "_id.year": 1, "_id.month": 1 } },
+                                   { $sort: { "_id.year": -1, "_id.month": -1 } },
                                    { $limit: 6 }
                             ]).toArray();
+                            monthlySales.reverse();
                             // Get The Payment Method Report
                             const paymentMethods = await ordersCollection.aggregate([
                                    {
@@ -501,8 +502,8 @@ async function run() {
                             total_amount: orderInfo?.totalAmount,
                             currency: 'BDT',
                             tran_id: tran_id,
-                            success_url: `http://localhost:5000/payment/success/${tran_id}`,
-                            fail_url: `http://localhost:5000/payment/fail/${tran_id}`,
+                            success_url: `https://e-commerce-server-zeta-eight.vercel.app/payment/success/${tran_id}`,
+                            fail_url: `https://e-commerce-server-zeta-eight.vercel.app/payment/fail/${tran_id}`,
                             cancel_url: 'http://localhost:3030/cancel',
                             ipn_url: 'http://localhost:3030/ipn',
                             shipping_method: 'Courier',
@@ -587,7 +588,7 @@ async function run() {
                             // Get The Order Id From Result
                             const orderId = result?._id?.toString();
                             // Redirect To Checkout Page & Send Order Id In Params
-                            res.redirect(`http://localhost:5173/checkOut?success=${orderId}`);
+                            res.redirect(`https://classyshop25.netlify.app/checkOut?success=${orderId}`);
                      }
               });
               // Payment Fail Url
@@ -599,7 +600,7 @@ async function run() {
                      // Check The Result
                      if (result.deletedCount > 0) {
                             // Redirect To Checkout Page & Send Fail Params
-                            res.redirect(`http://localhost:5173/checkOut?failed=true`)
+                            res.redirect(`https://classyshop25.netlify.app/checkOut?failed=true`)
                      }
               });
               // Create Invoice Api
@@ -943,8 +944,8 @@ async function run() {
                      }
               })
               // Send a ping to confirm a successful connection
-              await client.db("admin").command({ ping: 1 });
-              console.log("Pinged your deployment. You successfully connected to MongoDB!");
+              // await client.db("admin").command({ ping: 1 });
+              // console.log("Pinged your deployment. You successfully connected to MongoDB!");
        } finally {
               // Ensures that the client will close when you finish/error
               //   await client.close();
